@@ -190,6 +190,17 @@ enum JSONValue {
         }
     }
 
+    static func fromRaw(rawObject: AnyObject) -> JSONValue? {
+        let res = JSONValue(rawObject)
+
+        switch res {
+            case .JInvalid:
+                return nil
+            default:
+                return res
+        }
+    }
+
     subscript(index: Int) -> JSONValue {
         get {
             switch self {
@@ -212,6 +223,15 @@ enum JSONValue {
                 return JSONValue.JInvalid(NSError(domain: "JSONErrorDomain", code: 1002, userInfo: newUserInfo))
             }
         }
+//        set {
+//            switch self {
+//            case .JArray(var jsonArray):
+//                jsonArray[index] = newValue
+//                self = .JArray(jsonArray)
+//            default:
+//                return
+//            }
+//        }
     }
     
     subscript(key: String) -> JSONValue {
@@ -242,6 +262,45 @@ enum JSONValue {
                     "JSONErrorBreadCrumbKey": breadcrumb]
                 return JSONValue.JInvalid(NSError(domain: "JSONErrorDomain", code: 1002, userInfo: newUserInfo))
             }
+        }
+        set {
+            switch self {
+            case .JObject(var jsonDictionary):
+                jsonDictionary[key] = newValue
+                self = .JObject(jsonDictionary)
+            default:
+                return
+            }
+        }
+    }
+
+
+    func sub(key: String) -> JSONValue? {
+        switch self {
+        case .JObject(let jsonDictionary):
+            if let value = jsonDictionary[key] {
+                return value
+            }else {
+                let breadcrumb = "\(key)"
+                let newUserInfo = [NSLocalizedDescriptionKey: "JSON Keypath Error: Incorrect Keypath \"\(breadcrumb)\"",
+                    "JSONErrorBreadCrumbKey": breadcrumb]
+                return JSONValue.JInvalid(NSError(domain: "JSONErrorDomain", code: 1002, userInfo: newUserInfo))
+            }
+        case .JInvalid(let error):
+            if let userInfo = error.userInfo{
+                if let breadcrumb = userInfo["JSONErrorBreadCrumbKey"] as? NSString{
+                    let newBreadCrumb = (breadcrumb as String) + "/\(key)"
+                    let newUserInfo = [NSLocalizedDescriptionKey: "JSON Keypath Error: Incorrect Keypath \"\(newBreadCrumb)\"",
+                        "JSONErrorBreadCrumbKey": newBreadCrumb]
+                    return JSONValue.JInvalid(NSError(domain: "JSONErrorDomain", code: 1002, userInfo: newUserInfo))
+                }
+            }
+            return self
+        default:
+            let breadcrumb = "/\(key)"
+            let newUserInfo = [NSLocalizedDescriptionKey: "JSON Keypath Error: Incorrect Keypath \"\(breadcrumb)\"",
+                "JSONErrorBreadCrumbKey": breadcrumb]
+            return JSONValue.JInvalid(NSError(domain: "JSONErrorDomain", code: 1002, userInfo: newUserInfo))
         }
     }
 }
@@ -340,7 +399,7 @@ extension JSONValue: BooleanType {
 }
 
 extension JSONValue : Equatable {
-    
+
 }
 
 func ==(lhs: JSONValue, rhs: JSONValue) -> Bool {
@@ -389,5 +448,56 @@ func ==(lhs: JSONValue, rhs: JSONValue) -> Bool {
         }
     default:
         return false
+    }
+}
+
+
+extension JSONValue {
+
+    init (_ value: String) {
+        self = .JString(value)
+    }
+
+    init (_ value: Double) {
+        self = .JNumber(value)
+    }
+
+    init (_ value: Int) {
+        self = .JNumber(value)
+    }
+
+    init (_ value: Bool) {
+        self = .JBool(value)
+    }
+
+    init (_ value: [JSONValue] ) {
+        self = .JArray(value)
+    }
+
+    init () {
+        self = .JObject([String : JSONValue]())
+    }
+}
+
+
+
+extension JSONValue {
+    var rawJSONValue: AnyObject? {
+    switch self {
+    case .JNumber(let value):
+        return value
+    case .JBool(let value):
+        return value
+    case .JString(let value):
+        return value
+    case .JNull:
+        return nil
+    case .JArray(let array):
+        return self.rawJSONString
+    case .JObject(let object):
+        return self.rawJSONString
+    case .JInvalid:
+        return nil
+        }
     }
 }
